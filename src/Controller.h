@@ -77,10 +77,18 @@ public:
     RowTable<T>* rowtable;  // tracks metadata about rows (e.g., which are open and for how long)
     Refresh<T>* refresh;
 
+    //Parameters for ATLAS
     vector<int> AS; //ATLAS: track attained service per thread
     vector<int> TotalAS; //ATLAS: track total attained service per thread
     long quanta = 10000000;
     double Alpha = 0.875;
+
+    //Parameters for BLISS
+    long RequestsServed; //BLISS: Track the number of requests serviced per core/context
+    vector<long> Blacklist; //BLISS: Keep track of core/applications which have been blacklisted
+    long ClearingInterval = 10000; //BLISS: Interval after which we clear the blacklist
+    int BlacklistThresh = 4; //BLISS: Threshold after which the requests get blacklisted
+    int ApplicationId = 0;
 
     struct Queue {
         list<Request> q;
@@ -134,6 +142,9 @@ public:
         //ATLAS track the attained service per thread
         AS.resize(configs.get_core_num(),0);
         TotalAS.resize(configs.get_core_num(),0);
+
+        //BLISS track the IDs of contexts which have been blacklisted
+        Blacklist.resize(configs.get_core_num(),0);
 
         // regStats
 
@@ -347,7 +358,7 @@ public:
         read_req_queue_length_sum += readq.size() + pending.size();
         write_req_queue_length_sum += writeq.size();
 
-        /* Implementing ATLAS*/
+        // Implementing ATLAS
         if(clk%quanta ==0){
                 //transform(AS.begin(), AS.end(), AS.begin(), [Alpha](int &c){ return c*Alpha; })//TODO: Change data type of AS
                 for (int i = 0; i<  TotalAS.size(); i++) {
@@ -359,6 +370,13 @@ public:
                 //AB: No sorting required because we are not picking up values based on sorting.
                 // We just need to compare TotalAS[coreID] to decide the priority.                                           
             }
+
+        // Clearing the blacklist information for BLISS scheduler
+        if(clk%ClearingInterval == 0){
+            for(int i=0;i<Blacklist.size();i++){
+                Blacklist[i]=0;
+            }
+        }
 
         /*** 1. Serve completed reads ***/
         if (pending.size()) {

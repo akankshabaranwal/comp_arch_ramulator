@@ -70,8 +70,8 @@ public:
     Controller<T>* ctrl;
 
     enum class Type {
-        FCFS, FRFCFS, FRFCFS_Cap, FRFCFS_PriorHit, ATLAS, MAX
-    } type = Type::ATLAS; //Change this line to change scheduling policy
+        FCFS, FRFCFS, FRFCFS_Cap, FRFCFS_PriorHit, ATLAS, BLISS, MAX
+    } type = Type::BLISS; //Change this line to change scheduling policy
 
     long cap = 16; //Change this line to change cap
     long thresh = 100000; //Change this line to change ATLAS threshold
@@ -203,38 +203,149 @@ private:
 
             if (req1->arrive <= req2->arrive) return req1;
             return req2;},
+
         // ATLAS
         [this] (ReqIter req1, ReqIter req2) {
-            
-            //TH, sending over threshold requests first
-            if((this->ctrl->clk - req1->arrive) > thresh)
-                return req1;
-            if((this->ctrl->clk - req2->arrive) > thresh)
-                return req2;     
-
-            //Check TotalAS and return request based on whichever has lesser TotalAS
-            //TODO: CHeck if we need to take care of requests per bank
-            if(this->ctrl->TotalAS[req1->coreid] > this->ctrl->TotalAS[req2->coreid])
-            {
-                return req1;
-            }
-            else if(this->ctrl->TotalAS[req1->coreid] < this->ctrl->TotalAS[req2->coreid])
-            {
-                return req2;
-            }
-
             //RH. Row hit first
             bool ready1 = this->ctrl->is_ready(req1);
             bool ready2 = this->ctrl->is_ready(req2);
 
-            if (ready1 ^ ready2) {
-                if (ready1) return req1;
+            //Check if any request is over threshold
+            bool isOverThresh1 = ((this->ctrl->clk - req1->arrive) > thresh);
+            bool isOverThresh2 = ((this->ctrl->clk - req2->arrive) > thresh);
+            
+            //TH, sending over threshold requests first. Check if both requests are > thresh
+            if(isOverThresh1 ^ isOverThresh2){
+                if(isOverThresh1){
+                    this->ctrl->AS[req1->coreid]++;
+                    return req1;
+                }else{
+                    this->ctrl->AS[req2->coreid]++;
+                    return req2;
+                }
+            }
+
+            //Now we have taken care of overthreshold requests
+
+            // Whatever comes here 
+            //TODO: Check if we need to take care of requests per bank
+            if(this->ctrl->TotalAS[req1->coreid] < this->ctrl->TotalAS[req2->coreid]){
+                this->ctrl->AS[req1->coreid]++;
+                return req1;
+            }
+            else if(this->ctrl->TotalAS[req1->coreid] > this->ctrl->TotalAS[req2->coreid]){
+                this->ctrl->AS[req2->coreid]++;
                 return req2;
             }
 
-            //FCFS
-            if (req1->arrive <= req2->arrive) return req1;
-            return req2;}
+            //If TotalAS is same for both requests then priortize based on
+            if (ready1 ^ ready2) { //Row hit first
+                if (ready1) {
+                    this->ctrl->AS[req1->coreid]++;
+                    return req1;
+                }else{
+                    this->ctrl->AS[req2->coreid]++;
+                    return req2;
+                }
+            }
+
+            if (req1->arrive <= req2->arrive){
+                this->ctrl->AS[req1->coreid]++;
+                return req1;
+            }
+            else{
+                this->ctrl->AS[req2->coreid]++;
+                return req2;
+            }
+        },
+    
+        // BLISS
+        [this] (ReqIter req1, ReqIter req2) {        
+            // Check information of row hit or not
+            bool ready1 = this->ctrl->is_ready(req1);
+            bool ready2 = this->ctrl->is_ready(req2);
+
+            //Check if request has been blacklisted
+            bool blacklist1 = this->ctrl->Blacklist[req1->coreid];
+            bool blacklist2 = this->ctrl->Blacklist[req2->coreid];
+
+            //Handling requests when both are blacklisted or none are blacklisted
+            if(!(blacklist1 && blacklist2)||(blacklist1 && blacklist2)){   
+                if (ready1 ^ ready2) { //Return row hit requests first
+                    if (ready1) {
+                        if(this->ctrl->ApplicationId == req1->coreid){   
+                            this->ctrl->RequestsServed++;
+                            if(this->ctrl->RequestsServed>4)
+                            {
+                                this->ctrl->Blacklist[req1->coreid] = 1;
+                            }
+                        }else{
+                            this->ctrl->RequestsServed = 0;
+                            this->ctrl->ApplicationId = req1->coreid;
+                        }
+                        return req1;
+                    }else{
+                       if(this->ctrl->ApplicationId == req2->coreid){   
+                            this->ctrl->RequestsServed++;
+                            if(this->ctrl->RequestsServed>4){
+                                this->ctrl->Blacklist[req2->coreid] = 1;
+                            }
+                        }else{
+                            this->ctrl->RequestsServed = 0;
+                            this->ctrl->ApplicationId = req2->coreid;
+                        }                       
+                        return req2;
+                    }
+                }
+                if (req1->arrive <= req2->arrive){ //Return the request which arrived earlier first                    
+                    if(this->ctrl->ApplicationId == req1->coreid){   
+                            this->ctrl->RequestsServed++;
+                            if(this->ctrl->RequestsServed>4){
+                                this->ctrl->Blacklist[req1->coreid] = 1;
+                            }
+                        }else{
+                            this->ctrl->RequestsServed = 0;
+                            this->ctrl->ApplicationId = req1->coreid;
+                        }
+                    return req1;
+                }else{
+                      if(this->ctrl->ApplicationId == req2->coreid){   
+                            this->ctrl->RequestsServed++;
+                            if(this->ctrl->RequestsServed>4){
+                                this->ctrl->Blacklist[req2->coreid] = 1;
+                            }
+                        }else{
+                            this->ctrl->RequestsServed = 0;
+                            this->ctrl->ApplicationId = req2->coreid;
+                        }                                           
+                    return req2;
+                }
+            }
+            else if(!blacklist1){
+               if(this->ctrl->ApplicationId == req1->coreid){   
+                    this->ctrl->RequestsServed++;
+                    if(this->ctrl->RequestsServed>4)
+                    {   this->ctrl->Blacklist[req1->coreid] = 1;
+                    }
+                }else{
+                    this->ctrl->RequestsServed = 0;
+                    this->ctrl->ApplicationId = req1->coreid;
+                }
+                return req1;
+            }
+            else{   
+                if(this->ctrl->ApplicationId == req2->coreid){   
+                    this->ctrl->RequestsServed++;
+                    if(this->ctrl->RequestsServed>4){
+                       this->ctrl->Blacklist[req2->coreid] = 1;
+                    }
+                }else{
+                    this->ctrl->RequestsServed = 0;
+                    this->ctrl->ApplicationId = req2->coreid;
+                }
+                return req2;
+            }
+        }
     };
 };
 

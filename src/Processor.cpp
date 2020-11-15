@@ -49,7 +49,12 @@ Processor::Processor(const Config& configs,
             .desc("cpu cycle number")
             .precision(0)
             ;
+  instruction_throughput.name("instruction_throughput")
+            .desc("instruction throughput")
+            .precision(6)
+            ;          
   cpu_cycles = 0;
+  inst_retired = 0;
 }
 
 void Processor::tick() {
@@ -90,7 +95,9 @@ bool Processor::finished() {
       if (cores[i]->finished()) {
         for (unsigned int j = 0 ; j < cores.size() ; ++j) {
           ipc += cores[j]->calc_ipc();
+          inst_retired += cores[j]->record_insts.value();
         }
+        instruction_throughput = (double)(inst_retired/cpu_cycles.value());
         return true;
       }
     }
@@ -104,17 +111,22 @@ bool Processor::finished() {
         ipcs[i] = cores[i]->calc_ipc();
         ipc += ipcs[i];
       }
+      inst_retired += cores[i]->record_insts.value();
     }
+    instruction_throughput = (double)inst_retired/cpu_cycles.value();
     return true;
   }
 }
 
 bool Processor::has_reached_limit() {
+  inst_retired =0;
   for (unsigned int i = 0 ; i < cores.size() ; ++i) {
     if (!cores[i]->has_reached_limit()) {
       return false;
     }
+    inst_retired += cores[i]->record_insts.value();
   }
+instruction_throughput = (double)(inst_retired/cpu_cycles.value());
   return true;
 }
 

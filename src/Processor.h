@@ -143,7 +143,11 @@ public:
     std::shared_ptr<CacheSystem> cachesys;
     Cache llc;
 
+    double inst_retired;
+
     ScalarStat cpu_cycles;
+    ScalarStat instruction_throughput; //AB: Instruction throughput
+    
 };
 
 }

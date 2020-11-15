@@ -71,7 +71,7 @@ public:
 
     enum class Type {
         FCFS, FRFCFS, FRFCFS_Cap, FRFCFS_PriorHit, ATLAS, BLISS, MAX
-    } type = Type::BLISS; //Change this line to change scheduling policy
+    } type = Type::FCFS; //Change this line to change scheduling policy
 
     long cap = 16; //Change this line to change cap
     long thresh = 100000; //Change this line to change ATLAS threshold

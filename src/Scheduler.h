@@ -71,7 +71,7 @@ public:
 
     enum class Type {
         FCFS, FRFCFS, FRFCFS_Cap, FRFCFS_PriorHit, ATLAS, BLISS, MAX
-    } type = Type::ATLAS; //Change this line to change scheduling policy
+    } type = Type::BLISS; //Change this line to change scheduling policy
 
     long cap = 16; //Change this line to change cap
     long thresh = 100000; //Change this line to change ATLAS threshold
@@ -206,7 +206,8 @@ private:
 
         // ATLAS
         [this] (ReqIter req1, ReqIter req2) {
-            //RH. Row hit first
+
+            //Check which requests are ready
             bool ready1 = this->ctrl->is_ready(req1);
             bool ready2 = this->ctrl->is_ready(req2);
 
@@ -217,10 +218,10 @@ private:
             //TH, sending over threshold requests first. Check if both requests are > thresh
             if(isOverThresh1 ^ isOverThresh2){
                 if(isOverThresh1){
-                    this->ctrl->AS[req1->coreid]++;
+                    this->ctrl->LocalAS[req1->coreid]++;
                     return req1;
                 }else{
-                    this->ctrl->AS[req2->coreid]++;
+                    this->ctrl->LocalAS[req2->coreid]++;
                     return req2;
                 }
             }
@@ -228,33 +229,38 @@ private:
             //Now we have taken care of overthreshold requests
 
             // Whatever comes here 
-            //TODO: Check if we need to take care of requests per bank
-            if(this->ctrl->TotalAS[req1->coreid] < this->ctrl->TotalAS[req2->coreid]){
-                this->ctrl->AS[req1->coreid]++;
-                return req1;
-            }
-            else if(this->ctrl->TotalAS[req1->coreid] > this->ctrl->TotalAS[req2->coreid]){
-                this->ctrl->AS[req2->coreid]++;
-                return req2;
+
+            //Check if both requests are in the same bank then check rank.
+            //This is to take care of bank level parallelism
+            if(req1->addr_vec[int(T::Level::Bank)]==req2->addr_vec[int(T::Level::Bank)]){
+                if(this->ctrl->ThreadRank[req1->coreid] < this->ctrl->ThreadRank[req2->coreid]){
+                    this->ctrl->LocalAS[req1->coreid]++;
+                    return req1;
+                }
+                else if(this->ctrl->ThreadRank[req1->coreid] > this->ctrl->ThreadRank[req2->coreid]){
+                    this->ctrl->LocalAS[req2->coreid]++;
+                    return req2;
+                }
             }
 
-            //If TotalAS is same for both requests then priortize based on
+            //If the requests are to different banks then no need to block requests based on ThreadRank
+            //If ThreadRank is same for both requests then priortize based on
             if (ready1 ^ ready2) { //Row hit first
                 if (ready1) {
-                    this->ctrl->AS[req1->coreid]++;
+                    this->ctrl->LocalAS[req1->coreid]++;
                     return req1;
                 }else{
-                    this->ctrl->AS[req2->coreid]++;
+                    this->ctrl->LocalAS[req2->coreid]++;
                     return req2;
                 }
             }
 
             if (req1->arrive <= req2->arrive){
-                this->ctrl->AS[req1->coreid]++;
+                this->ctrl->LocalAS[req1->coreid]++;
                 return req1;
             }
             else{
-                this->ctrl->AS[req2->coreid]++;
+                this->ctrl->LocalAS[req2->coreid]++;
                 return req2;
             }
         },
@@ -270,7 +276,7 @@ private:
             bool blacklist2 = this->ctrl->Blacklist[req2->coreid];
 
             //Handling requests when both are blacklisted or none are blacklisted
-            if(!(blacklist1 && blacklist2)||(blacklist1 && blacklist2)){   
+            if((!blacklist1 && !blacklist2)||(blacklist1 && blacklist2)){   
                 if (ready1 ^ ready2) { //Return row hit requests first
                     if (ready1) {
                         if(this->ctrl->ApplicationId == req1->coreid){   

@@ -73,6 +73,7 @@ protected:
   long max_address;
   MapScheme mapping_scheme;
   
+
 public:
     enum class Type {
         ChRaBaRoCo,
@@ -104,11 +105,17 @@ public:
     
     int tx_bits;
 
+    vector<int> TotalAS; //ATLAS: track total attained service per thread
+    long quanta = 10000000; //ATLAS: Quantum 
+    double Alpha = 0.875; //ATLAS: Alpha
+
     Memory(const Config& configs, vector<Controller<T>*> ctrls)
         : ctrls(ctrls),
           spec(ctrls[0]->channel->spec),
           addr_bits(int(T::Level::MAX))
     {
+        TotalAS.resize(configs.get_core_num(),0);//ATLAS: Resize TotalAS
+
         // make sure 2^N channels/ranks
         // TODO support channel number that is not powers of 2
         int *sz = spec->org_entry.count;
@@ -300,6 +307,25 @@ public:
         }
         if (is_active) {
           ramulator_active_cycles++;
+        }
+
+        long AS;
+        if(long(num_dram_cycles.value()) % quanta ==0) //ATLAS synchronize at the end of each quantum of time
+        {
+            //Update TotalAS
+            for(int i=0;i<TotalAS.size();i++)
+            {   AS =0;
+                for (auto ctrl : ctrls) {
+                   AS = AS + ctrl -> LocalAS[i];
+                   ctrl -> LocalAS[i] = 0; // Reset the LocalAS to 0.
+                }
+                TotalAS[i] = (Alpha * TotalAS[i]) + (1-Alpha)*AS;
+            }
+            for (auto ctrl : ctrls){ // Broadcast the thread rank for each core
+                for(int i=0;i<TotalAS.size();i++){
+                    ctrl -> ThreadRank[i] = TotalAS[i];       
+                }
+            }
         }
     }
 

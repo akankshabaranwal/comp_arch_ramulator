@@ -78,10 +78,9 @@ public:
     Refresh<T>* refresh;
 
     //Parameters for ATLAS
-    vector<int> AS; //ATLAS: track attained service per thread
-    vector<int> TotalAS; //ATLAS: track total attained service per thread
-    long quanta = 10000000;
-    double Alpha = 0.875;
+    vector<int> LocalAS; //ATLAS: track attained service per thread
+    vector<int> ThreadRank; //ATLAS: track total attained service per thread
+
 
     //Parameters for BLISS
     long RequestsServed; //BLISS: Track the number of requests serviced per core/context
@@ -140,8 +139,8 @@ public:
         }
 
         //ATLAS track the attained service per thread
-        AS.resize(configs.get_core_num(),0);
-        TotalAS.resize(configs.get_core_num(),0);
+        LocalAS.resize(configs.get_core_num(),0);
+        ThreadRank.resize(configs.get_core_num(),0);
 
         //BLISS track the IDs of contexts which have been blacklisted
         Blacklist.resize(configs.get_core_num(),0);
@@ -359,17 +358,14 @@ public:
         write_req_queue_length_sum += writeq.size();
 
         // Implementing ATLAS
-        if(clk%quanta ==0){
-                //transform(AS.begin(), AS.end(), AS.begin(), [Alpha](int &c){ return c*Alpha; })//TODO: Change data type of AS
-                for (int i = 0; i<  TotalAS.size(); i++) {
-                    TotalAS[i]= Alpha* TotalAS[i] + AS[i]; //ATLAS: Updating values of Total attained service
-                }
-                for (int i = 0; i<  AS.size(); i++) {
-                    AS[i]= 0; //ATLAS: Resetting attained service values
-                }
-                //AB: No sorting required because we are not picking up values based on sorting.
-                // We just need to compare TotalAS[coreID] to decide the priority.                                           
-            }
+        //if(clk%quanta ==0){
+         //       for (int i = 0; i<  ThreadRank.size(); i++) {
+         //           ThreadRank[i]= Alpha* ThreadRank[i] + (1-Alpha)LocalAS[i]; //ATLAS: Updating values of Total attained service
+         //       }
+         //       for (int i = 0; i<  LocalAS.size(); i++) {
+         //           LocalAS[i]= 0; //ATLAS: Resetting attained service values
+        //        }
+        //    }
 
         // Clearing the blacklist information for BLISS scheduler
         if(clk%ClearingInterval == 0){

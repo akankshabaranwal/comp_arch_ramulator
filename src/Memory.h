@@ -109,12 +109,23 @@ public:
     long quanta = 10000000; //ATLAS: Quantum 
     double Alpha = 0.875; //ATLAS: Alpha
 
+    vector<int> Blacklist; //BLISS: track blacklisted apps
+    long ClearingInterval = 10000; //BLISS interval at which blacklist is cleared  
+    int ApplicationId=0;
+    long RequestsServed=0;
+
     Memory(const Config& configs, vector<Controller<T>*> ctrls)
         : ctrls(ctrls),
           spec(ctrls[0]->channel->spec),
           addr_bits(int(T::Level::MAX))
     {
+        for (auto ctrl: ctrls)
+        {
+            ctrl->setBlacklist(&Blacklist, &ApplicationId, &RequestsServed);
+        }
+
         TotalAS.resize(configs.get_core_num(),0);//ATLAS: Resize TotalAS
+        Blacklist.resize(configs.get_core_num(),0);//BLISS: Resize Blacklist
 
         // make sure 2^N channels/ranks
         // TODO support channel number that is not powers of 2
@@ -325,6 +336,15 @@ public:
                 for(int i=0;i<TotalAS.size();i++){
                     ctrl -> ThreadRank[i] = TotalAS[i];       
                 }
+            }
+        }
+
+        //Clearing blacklist for BLISS
+        if(long(num_dram_cycles.value()) % ClearingInterval ==0)
+        {
+            for(int i=0;i<Blacklist.size();i++)
+            {
+                Blacklist[i]=0;
             }
         }
     }

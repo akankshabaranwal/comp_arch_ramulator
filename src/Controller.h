@@ -81,13 +81,16 @@ public:
     vector<int> LocalAS; //ATLAS: track attained service per thread
     vector<int> ThreadRank; //ATLAS: track total attained service per thread
 
-
     //Parameters for BLISS
-    long RequestsServed; //BLISS: Track the number of requests serviced per core/context
-    vector<long> Blacklist; //BLISS: Keep track of core/applications which have been blacklisted
-    long ClearingInterval = 10000; //BLISS: Interval after which we clear the blacklist
-    int BlacklistThresh = 4; //BLISS: Threshold after which the requests get blacklisted
-    int ApplicationId = 0;
+    vector<int> *Blacklist;
+    int *ApplicationId;
+    long *RequestsServed; //BLISS: Track the number of requests serviced per core/context
+
+    
+    //vector<long> Blacklist; //BLISS: Keep track of core/applications which have been blacklisted
+    //long ClearingInterval = 10000; //BLISS: Interval after which we clear the blacklist
+    //int BlacklistThresh = 4; //BLISS: Threshold after which the requests get blacklisted
+    //int ApplicationId = 0;
 
     struct Queue {
         list<Request> q;
@@ -143,7 +146,6 @@ public:
         ThreadRank.resize(configs.get_core_num(),0);
 
         //BLISS track the IDs of contexts which have been blacklisted
-        Blacklist.resize(configs.get_core_num(),0);
 
         // regStats
 
@@ -312,6 +314,13 @@ public:
         cmd_trace_files.clear();
     }
 
+    //BLISS Set blacklist
+    void setBlacklist(std::vector<int> *blacklisT, int *applicationId, long *requestsserved){
+        this->Blacklist = blacklisT;
+        this->ApplicationId = applicationId;
+        this->RequestsServed = requestsserved;
+    }
+
     void finish(long read_req, long dram_cycles) {
       read_latency_avg = read_latency_sum.value() / read_req;
       req_queue_length_avg = req_queue_length_sum.value() / dram_cycles;
@@ -356,23 +365,6 @@ public:
         req_queue_length_sum += readq.size() + writeq.size() + pending.size();
         read_req_queue_length_sum += readq.size() + pending.size();
         write_req_queue_length_sum += writeq.size();
-
-        // Implementing ATLAS
-        //if(clk%quanta ==0){
-         //       for (int i = 0; i<  ThreadRank.size(); i++) {
-         //           ThreadRank[i]= Alpha* ThreadRank[i] + (1-Alpha)LocalAS[i]; //ATLAS: Updating values of Total attained service
-         //       }
-         //       for (int i = 0; i<  LocalAS.size(); i++) {
-         //           LocalAS[i]= 0; //ATLAS: Resetting attained service values
-        //        }
-        //    }
-
-        // Clearing the blacklist information for BLISS scheduler
-        if(clk%ClearingInterval == 0){
-            for(int i=0;i<Blacklist.size();i++){
-                Blacklist[i]=0;
-            }
-        }
 
         /*** 1. Serve completed reads ***/
         if (pending.size()) {

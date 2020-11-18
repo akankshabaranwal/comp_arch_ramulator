@@ -226,10 +226,6 @@ private:
                 }
             }
 
-            //Now we have taken care of overthreshold requests
-
-            // Whatever comes here 
-
             //Check if both requests are in the same bank then check rank.
             //This is to take care of bank level parallelism
             if(req1->addr_vec[int(T::Level::Bank)]==req2->addr_vec[int(T::Level::Bank)]){
@@ -272,82 +268,86 @@ private:
             bool ready2 = this->ctrl->is_ready(req2);
 
             //Check if request has been blacklisted
-            bool blacklist1 = this->ctrl->Blacklist[req1->coreid];
-            bool blacklist2 = this->ctrl->Blacklist[req2->coreid];
+
+            bool blacklist1 = (*this->ctrl->Blacklist)[req1->coreid];
+            bool blacklist2 = (*this->ctrl->Blacklist)[req2->coreid];
 
             //Handling requests when both are blacklisted or none are blacklisted
             if((!blacklist1 && !blacklist2)||(blacklist1 && blacklist2)){   
                 if (ready1 ^ ready2) { //Return row hit requests first
                     if (ready1) {
-                        if(this->ctrl->ApplicationId == req1->coreid){   
-                            this->ctrl->RequestsServed++;
-                            if(this->ctrl->RequestsServed>4)
-                            {
-                                this->ctrl->Blacklist[req1->coreid] = 1;
+                        if(*(this->ctrl->ApplicationId) == req1->coreid){   
+                            *(this->ctrl->RequestsServed)=*(this->ctrl->RequestsServed)+1;
+                            if(*(this->ctrl->RequestsServed)>4)
+                            {   //printf("blacklist\n");
+                                (*this->ctrl->Blacklist)[req1->coreid] = 1;
                             }
                         }else{
-                            this->ctrl->RequestsServed = 0;
-                            this->ctrl->ApplicationId = req1->coreid;
+                            //printf("blacklist\n");
+                            *(this->ctrl->RequestsServed) = 0;
+                            *(this->ctrl->ApplicationId) = req1->coreid;
                         }
                         return req1;
                     }else{
-                       if(this->ctrl->ApplicationId == req2->coreid){   
-                            this->ctrl->RequestsServed++;
-                            if(this->ctrl->RequestsServed>4){
-                                this->ctrl->Blacklist[req2->coreid] = 1;
+                       if(*(this->ctrl->ApplicationId) == req2->coreid){   
+                            *(this->ctrl->RequestsServed)=*(this->ctrl->RequestsServed)+1;
+                            if(*(this->ctrl->RequestsServed)>4){
+                                (*this->ctrl->Blacklist)[req2->coreid] = 1;
                             }
                         }else{
-                            this->ctrl->RequestsServed = 0;
-                            this->ctrl->ApplicationId = req2->coreid;
+                            *(this->ctrl->RequestsServed) = 0;
+                            *(this->ctrl->ApplicationId) = req2->coreid;
                         }                       
                         return req2;
                     }
                 }
                 if (req1->arrive <= req2->arrive){ //Return the request which arrived earlier first                    
-                    if(this->ctrl->ApplicationId == req1->coreid){   
-                            this->ctrl->RequestsServed++;
-                            if(this->ctrl->RequestsServed>4){
-                                this->ctrl->Blacklist[req1->coreid] = 1;
+                    if(*(this->ctrl->ApplicationId) == req1->coreid){   
+                            *(this->ctrl->RequestsServed)=*(this->ctrl->RequestsServed)+1;
+                            if(*(this->ctrl->RequestsServed)>4){
+                                (*this->ctrl->Blacklist)[req1->coreid] = 1;
                             }
                         }else{
-                            this->ctrl->RequestsServed = 0;
-                            this->ctrl->ApplicationId = req1->coreid;
+                            *(this->ctrl->RequestsServed) = 0;
+                            *(this->ctrl->ApplicationId) = req1->coreid;
                         }
                     return req1;
                 }else{
-                      if(this->ctrl->ApplicationId == req2->coreid){   
-                            this->ctrl->RequestsServed++;
-                            if(this->ctrl->RequestsServed>4){
-                                this->ctrl->Blacklist[req2->coreid] = 1;
+                      if(*(this->ctrl->ApplicationId) == req2->coreid){   
+                            *(this->ctrl->RequestsServed)=*(this->ctrl->RequestsServed)+1;
+                            if(*(this->ctrl->RequestsServed)>4){
+                                (*this->ctrl->Blacklist)[req2->coreid] = 1;
                             }
                         }else{
-                            this->ctrl->RequestsServed = 0;
-                            this->ctrl->ApplicationId = req2->coreid;
+                            *(this->ctrl->RequestsServed) = 0;
+                            *(this->ctrl->ApplicationId) = req2->coreid;
                         }                                           
                     return req2;
                 }
             }
             else if(!blacklist1){
-               if(this->ctrl->ApplicationId == req1->coreid){   
-                    this->ctrl->RequestsServed++;
-                    if(this->ctrl->RequestsServed>4)
-                    {   this->ctrl->Blacklist[req1->coreid] = 1;
+               // printf("here1\n");
+               if(*(this->ctrl->ApplicationId) == req1->coreid){   
+                    *(this->ctrl->RequestsServed)=*(this->ctrl->RequestsServed)+1;
+                    if(*(this->ctrl->RequestsServed)>4)
+                    {   (*this->ctrl->Blacklist)[req1->coreid] = 1;
                     }
                 }else{
-                    this->ctrl->RequestsServed = 0;
-                    this->ctrl->ApplicationId = req1->coreid;
+                    *(this->ctrl->RequestsServed) = 0;
+                    *(this->ctrl->ApplicationId) = req1->coreid;
                 }
                 return req1;
             }
             else{   
-                if(this->ctrl->ApplicationId == req2->coreid){   
-                    this->ctrl->RequestsServed++;
-                    if(this->ctrl->RequestsServed>4){
-                       this->ctrl->Blacklist[req2->coreid] = 1;
+               // printf("here2\n");
+                if(*(this->ctrl->ApplicationId) == req2->coreid){   
+                    *(this->ctrl->RequestsServed)=*(this->ctrl->RequestsServed)+1;
+                    if(*(this->ctrl->RequestsServed)>4){
+                       (*this->ctrl->Blacklist)[req2->coreid] = 1;
                     }
                 }else{
-                    this->ctrl->RequestsServed = 0;
-                    this->ctrl->ApplicationId = req2->coreid;
+                    *(this->ctrl->RequestsServed) = 0;
+                    *(this->ctrl->ApplicationId) = req2->coreid;
                 }
                 return req2;
             }
